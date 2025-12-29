@@ -24,6 +24,14 @@ endif
 let s:server_port = v:null
 let s:server_job = v:null
 
+function! s:ConfigDir() abort
+  let config_dir = $XDG_CONFIG_HOME
+  if empty(config_dir)
+    let config_dir = $HOME . '/.config'
+  endif
+  return config_dir . '/neopilot'
+endfunction
+
 function! s:DownloadBinary(bin, url) abort
   try
     call neopilot#log#Info("Downloading language server from " . a:url)
@@ -161,12 +169,10 @@ function! neopilot#server#Start() abort
   endif
 
   let s:root = expand('<sfile>:h:h')
-  let bin_dir = s:root . "/bin"
+  let bin_dir = s:ConfigDir() . '/bin'
   let bin = bin_dir . "/language_server_" . bin_suffix
 
-  if !isdirectory(bin_dir)
-    call mkdir(bin_dir)
-  endif
+  call mkdir(bin_dir, "p")
 
   if empty(glob(bin))
     let url = 'https://github.com/neopilot-ai/neopilot/releases/download/language-server-v' . s:language_server_version . '/language_server_' . bin_suffix . '.gz'
