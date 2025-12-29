@@ -1,3 +1,4 @@
+# Copybara import generated
 Function Expand-File
 {
     Param(

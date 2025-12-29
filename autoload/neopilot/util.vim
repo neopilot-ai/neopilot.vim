@@ -1,3 +1,4 @@
+" Copybara import generated
 let s:line_endings = {
       \ "unix": "\n",
       \ "dos": "\r\n",
