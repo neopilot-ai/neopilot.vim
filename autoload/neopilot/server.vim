@@ -1,0 +1,215 @@
+let s:language_server_version = '1.1.14'
+
+if has('nvim')
+  let s:ide = 'neovim'
+else 
+  let s:ide = 'vim'
+endif
+
+if !exists('s:editor_version')
+  if has('nvim')
+    let s:ide_version = matchstr(execute('version'), 'NVIM v\zs[^[:space:]]\+')
+  else
+    let major = v:version / 100
+    let minor = v:version % 100
+    if exists('v:versionlong')
+      let patch = printf('%04d', v:versionlong % 1000)
+      let s:ide_version =  major . '.' . minor . '.' . patch
+    else
+      let s:ide_version =  major . '.' . minor
+    endif
+  endif
+endif
+
+let s:server_port = v:null
+let s:server_job = v:null
+
+function! s:DownloadBinary(bin, url) abort
+  try
+    call neopilot#log#Info("Downloading language server from " . a:url)
+    let download_cmd = 'curl -Lo ' . a:bin . '.gz' . ' ' . a:url
+    let result = system(download_cmd)
+    if v:shell_error != 0
+      call neopilot#log#Error("Failed to download binary: " . result)
+      return v:false
+    endif
+
+    let extract_cmd = 'gzip -d ' . a:bin . '.gz'
+    let result = system(extract_cmd)
+    if v:shell_error != 0
+      call neopilot#log#Error("Failed to extract binary: " . result)
+      return v:false
+    endif
+
+    let chmod_cmd = 'chmod +x ' . a:bin
+    let result = system(chmod_cmd)
+    if v:shell_error != 0
+      call neopilot#log#Error("Failed to make binary executable: " . result)
+      return v:false
+    endif
+
+    if !filereadable(a:bin)
+      call neopilot#log#Error("Binary download failed - file not found: " . a:bin)
+      return v:false
+    endif
+
+    call neopilot#log#Info("Successfully downloaded and extracted binary")
+    return v:true
+  catch
+    call neopilot#log#Exception()
+    return v:false
+  endtry
+endfunction
+
+function! s:OnExit(result, status, on_complete_cb) abort
+  let did_close = has_key(a:result, 'closed')
+  if did_close
+    call remove(a:result, 'closed')
+    call a:on_complete_cb(a:result.out, a:status)
+  else
+    " Wait until we receive OnClose, and call on_complete_cb then.
+    let a:result.exit_status = a:status
+  endif
+endfunction
+
+function! s:OnClose(result, on_complete_cb) abort
+  let did_exit = has_key(a:result, 'exit_status')
+  if did_exit
+    call a:on_complete_cb(a:result.out, a:result.exit_status)
+  else
+    " Wait until we receive OnExit, and call on_complete_cb then.
+    let a:result.closed = v:true
+  endif
+endfunction
+
+function! s:NoopCallback(...) abort
+endfunction
+
+function! neopilot#server#RequestMetadata() abort
+  return {
+        \ "api_key": neopilot#command#ApiKey(),
+        \ "ide_name":  s:ide,
+        \ "ide_version":  s:ide_version,
+        \ "extension_version":  s:language_server_version,
+        \ }
+endfunction
+
+function! neopilot#server#Request(type, data, ...) abort
+  if s:server_port is# v:null
+    throw "Server port has not been properly initialized."
+  endif
+  let uri = 'http://localhost:' . s:server_port . 
+      \ '/exa.language_server_pb.LanguageServerService/' . a:type
+  let args = [
+              \ 'curl', uri,
+              \ '--header', 'Content-Type: application/json',
+              \ '--data', json_encode(a:data)
+              \ ]
+  let result = {"out": []}
+  let ExitCallback = a:0 && !empty(a:1) ? a:1 : function('s:NoopCallback')
+  if has('nvim')
+    return jobstart(args, {
+                \ 'on_stdout': { channel, data, t -> add(result.out, join(data, "\n")) },
+                \ 'on_exit': { job, status, t -> ExitCallback(result.out, status) },
+                \ })
+  else
+    return job_start(args, {
+                \ 'out_mode': 'raw',
+                \ 'out_cb': { channel, data -> add(result.out, data) },
+                \ 'exit_cb': { job, status -> s:OnExit(result, status, ExitCallback) },
+                \ 'close_cb': { channel -> s:OnClose(result, ExitCallback) }
+                \ })
+  endif
+endfunction
+
+function! s:FindPort(dir, timer) abort
+  let time = localtime()
+  for name in readdir(a:dir)
+    let path = a:dir . '/' . name
+    if time - getftime(path) <= 5 && getftype(path) == "file"
+      call neopilot#log#Info("Found port: " . name)
+      let s:server_port = name
+      call timer_stop(a:timer)
+      break
+    endif
+  endfor
+endfunction
+
+function! s:SendHeartbeat(timer) abort
+  try
+    call neopilot#server#Request('Heartbeat', {'metadata': neopilot#server#RequestMetadata()})
+  catch
+    call neopilot#log#Exception()
+  endtry
+endfunction
+
+function! neopilot#server#Start() abort
+  let os = substitute(system('uname'), '\n', '', '')
+  let arch = substitute(system('uname -m'), '\n', '', '')
+  let is_arm = stridx(arch, "arm") == 0 || stridx(arch, "aarch64") == 0
+
+  if os == 'Linux' && is_arm
+    let bin_suffix = "linux_arm"
+  elseif os == 'Linux'
+    let bin_suffix = "linux_x64"
+  elseif os == 'Darwin' && is_arm
+    let bin_suffix = "macos_arm"
+  elseif os == 'Darwin'
+    let bin_suffix = "macos_x64"
+  else
+    let bin_suffix = "windows_x64.exe"
+  endif
+
+  let s:root = expand('<sfile>:h:h')
+  let bin_dir = s:root . "/bin"
+  let bin = bin_dir . "/language_server_" . bin_suffix
+
+  if !isdirectory(bin_dir)
+    call mkdir(bin_dir)
+  endif
+
+  if empty(glob(bin))
+    let url = 'https://github.com/neopilot-ai/neopilot/releases/download/language-server-v' . s:language_server_version . '/language_server_' . bin_suffix . '.gz'
+    if !s:DownloadBinary(bin, url)
+      return ''
+    endif
+  endif
+
+  let config = get(g:, "neopilot_server_config", {})
+  let port_config = get(g:, "neopilot_port_config", {})
+
+  let api_host = get(config, "api_host", "server.neopilot.com")
+  let api_port = get(config, "api_port", "443")
+  if has_key(port_config, "web_server")
+    let api_port = port_config.web_server
+  endif
+
+  let chat_client_port_arg = []
+  if has_key(port_config, "chat_client")
+    let chat_client_port_arg = ["--chat_client_port", port_config.chat_client]
+  endif
+
+  let manager_dir = tempname() . '/neopilot/manager'
+  call mkdir(manager_dir, "p")
+
+  let args = [
+        \ bin,
+        \ "--api_server_host", api_host,
+        \ "--api_server_port", api_port,
+        \ "--manager_dir", manager_dir
+        \ ] + chat_client_port_arg
+
+  call neopilot#log#Info("Launching server with manager_dir " . manager_dir)
+  if has('nvim')
+    let s:server_job = jobstart(args, {
+                \ 'on_stderr': { channel, data, t -> neopilot#log#Info("[SERVER] " . join(data, "\n")) },
+                \ })
+  else
+    let s:server_job = job_start(args, {
+                \ 'out_mode': 'raw',
+                \ 'err_cb': { channel, data -> neopilot#log#Info("[SERVER] " . data) },
+                \ })
+  endif
+  call timer_start(500, function('s:FindPort', [manager_dir]), {'repeat': -1})
+  call timer_start(5000, function('s:SendHeartbeat', []), {'repeat': -1})
+endfunction
