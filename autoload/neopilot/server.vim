@@ -101,7 +101,7 @@ function! neopilot#server#Request(type, data, ...) abort
     throw "Server port has not been properly initialized."
   endif
   let uri = 'http://localhost:' . s:server_port . 
-      \ '/exa.language_server_pb.LanguageServerService/' . a:type
+      \ '/neo.language_server_pb.LanguageServerService/' . a:type
   let args = [
               \ 'curl', uri,
               \ '--header', 'Content-Type: application/json',
