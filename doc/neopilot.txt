@@ -1,0 +1,84 @@
+*neopilot.txt*  Neopilot
+
+GETTING STARTED                                 *neopilot*
+
+Run the `:Neopilot Auth` command to login to Neopilot. This is required to
+enable the plugin.
+
+Once logged in, suggested completions will be displayed inline as virtual
+text. You can insert a completion by pressing <Tab>.
+
+COMMANDS                                        *:Neopilot*
+
+                                                *:Neopilot_Auth*
+:Neopilot Auth           Authenticate to Neopilot.
+
+                                                *:Neopilot_Disable*
+:Neopilot Disable        Disable Neopilot completions
+
+                                                *:Neopilot_Enable*
+:Neopilot Enable         Re-enable Neopilot completions after running :Neopilot Disable
+
+                                                *:Neopilot_DisableBuffer*
+:Neopilot DisableBuffer  Disable Neopilot completions in the current buffer only.
+
+                                                *:Neopilot_EnableBuffer*
+:Neopilot EnableBuffer   Re-eisable Neopilot completions in the current
+                        buffer after running :Neopilot DisableBuffer
+
+                                                *:Neopilot_Chat*
+:Neopilot Chat           Open an interactive chat window with Neopilot AI.
+
+
+OPTIONS                                         *neopilot-options*
+
+                                                *g:neopilot_filetypes*
+g:neopilot_filetypes     A dictionary mapping whether neopilot should be
+                        enabled or disabled in certain filetypes. This can
+                        be used to opt out of completions for certain filetypes.
+>
+                        let g:neopilot_filetypes = {
+                              \ 'bash': v:false,
+                              \ 'typescript': v:true,
+                              \ }
+<
+
+                                                *g:neopilot_filetypes*
+g:neopilot_enabled       A global boolean flag that controls whether neopilot
+                        completions are enabled or disabled by default.
+>
+                        let g:neopilot_enabled = v:true
+<
+
+MAPS                                            *neopilot-maps*
+
+                                                *neopilot-i_<Tab>*
+Neopilot.vim defaults to using the <Tab> key to insert the current
+suggestion. If there is no suggestion display, the <Tab> key will fallback
+to any existing <Tab> mapping you have.
+
+Other Maps ~
+
+                                                *neopilot-i_CTRL-]*
+<C-]>                   Dismiss the current suggestion.
+<Plug>(neopilot-dismiss)
+
+                                                *neopilot-i_ALT-]*
+<M-]>                   Cycle to the next suggestion.
+<Plug>(neopilot-next)
+
+                                                *neopilot-i_ALT-[*
+<M-[>                   Cycle to the previous suggestion.
+<Plug>(neopilot-previous)
+
+SYNTAX HIGHLIGHTING                             *neopilot-highlighting*
+
+Inline suggestions are highlighted using the NeopilotSuggestion group,
+which defaults to a gray color. You can configure this highlight group for
+your colorscheme in after/colors/<colorschemename>.vim in your
+'runtimepath' (e.g., ~/.config/nvim/after/colors/solarized.vim).  Example
+declaration:
+>
+        highlight NeopilotSuggestion guifg=#555555 ctermfg=8
+<
+ vim:tw=78:et:ft=help:norl:
