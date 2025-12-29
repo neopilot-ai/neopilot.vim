@@ -1,5 +1,7 @@
 *neopilot.txt*  Neopilot
 
+" Copybara import generated
+
 GETTING STARTED                                 *neopilot*
 
 Run the `:Neopilot Auth` command to login to Neopilot. This is required to

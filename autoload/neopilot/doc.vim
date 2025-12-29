@@ -1,3 +1,4 @@
+" Copybara import generated
 let s:language_enum = {
       \ "unspecified": 0,
       \ "c": 1,

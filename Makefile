@@ -1,3 +1,4 @@
+# Copybara import generated
 .PHONY: help version tag test clean
 
 # Default target

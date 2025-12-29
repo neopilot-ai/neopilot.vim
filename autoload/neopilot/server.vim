@@ -1,4 +1,6 @@
+" Copybara import generated
 let s:language_server_version = '1.1.14'
+let s:root = expand('<sfile>:h:h:h')
 
 if has('nvim')
   let s:ide = 'neovim'
@@ -99,7 +101,7 @@ function! neopilot#server#Request(type, data, ...) abort
     throw "Server port has not been properly initialized."
   endif
   let uri = 'http://localhost:' . s:server_port . 
-      \ '/exa.language_server_pb.LanguageServerService/' . a:type
+      \ '/neo.language_server_pb.LanguageServerService/' . a:type
   let args = [
               \ 'curl', uri,
               \ '--header', 'Content-Type: application/json',
@@ -186,6 +188,32 @@ function! neopilot#server#Start() abort
 
   if empty(glob(bin))
     let url = 'https://github.com/neopilot-ai/neopilot/releases/download/language-server-v' . s:language_server_version . '/language_server_' . bin_suffix . '.gz'
+    call system('curl -Lo ' . shellescape(bin . '.gz') . ' ' . url)
+    if has("win32")
+      " Save old settings.
+      let old_shell = &shell
+      let old_shellquote = &shellquote
+      let old_shellpipe = &shellpipe
+      let old_shellxquote = &shellxquote
+      let old_shellcmdflag = &shellcmdflag
+      let old_shellredir = &shellredir
+      " Switch to powershell.
+      let &shell = 'powershell'
+      set shellquote= shellpipe=\| shellxquote=
+      set shellcmdflag=-NoLogo\ -NoProfile\ -ExecutionPolicy\ RemoteSigned\ -Command
+      set shellredir=\|\ Out-File\ -Encoding\ UTF8
+      call system('& { . ' . shellescape(s:root . '/powershell/gzip.ps1') . '; Expand-File ' . shellescape(bin . '.gz') . ' }')
+      " Restore old settings.
+      let &shell = old_shell
+      let &shellquote = old_shellquote
+      let &shellpipe = old_shellpipe
+      let &shellxquote = old_shellxquote
+      let &shellcmdflag = old_shellcmdflag
+      let &shellredir = old_shellredir
+    else
+      call system('gzip -d ' . bin . '.gz')
+      call system('chmod +x ' . bin)
+    endif
     if !s:DownloadBinary(bin, url)
       call neopilot#log#Error("Failed to start server: could not download binary")
       return ''

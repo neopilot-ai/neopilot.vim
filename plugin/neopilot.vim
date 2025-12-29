@@ -1,3 +1,4 @@
+" Copybara import generated
 if exists("g:loaded_neopilot")
   finish
 endif

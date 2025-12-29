@@ -1,3 +1,4 @@
+" Copybara import generated
 function! neopilot#command#BrowserCommand() abort
   if has('win32') && executable('rundll32')
     return 'rundll32 url.dll,FileProtocolHandler'
