@@ -1,3 +1,4 @@
+" Copybara import generated
 let s:hlgroup = 'NeopilotSuggestion'
 let s:annot_hlgroup = 'NeopilotAnnotation'
 let s:request_nonce = 0

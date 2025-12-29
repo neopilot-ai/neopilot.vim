@@ -1,3 +1,4 @@
+<!-- Copybara import generated -->
 # Neopilot.vim
 
 AI-powered code completion for Vim/Neovim, inspired by GitHub Copilot.
