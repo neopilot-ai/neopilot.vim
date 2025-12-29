@@ -21,11 +21,7 @@ function! s:Uuid() abort
 endfunction
 
 function! s:ConfigDir() abort
-  let config_dir = $XDG_CONFIG_HOME
-  if empty(config_dir)
-    let config_dir = $HOME . '/.config'
-  endif
-  return config_dir . '/neopilot'
+  return neopilot#util#ConfigDir()
 endfunction
 
 function! s:LoadConfig() abort
@@ -151,16 +147,26 @@ function! s:commands.Chat(...) abort
     call setbufvar(chat_bufnr, '&bufhidden', 'hide')
     call setbufvar(chat_bufnr, '&swapfile', 0)
     call setbufvar(chat_bufnr, '&filetype', 'neopilot-chat')
+    call setbufvar(chat_bufnr, '&modifiable', 1)
     
     " Add initial content
-    call setbufline(chat_bufnr, 1, [
-          \ 'Neopilot Chat',
-          \ '============',
+    let welcome_msg = [
+          \ 'Neopilot Chat - AI Assistant',
+          \ '================================',
           \ '',
-          \ 'Welcome to Neopilot Chat! Ask me anything about coding.',
+          \ 'Welcome! I can help you with coding questions and provide assistance.',
+          \ '',
+          \ 'Commands:',
+          \ '  /clear  - Clear the chat history',
+          \ '  /help   - Show this help message',
+          \ '  /quit   - Close the chat',
+          \ '',
+          \ 'Just type your message and press Enter to send.',
           \ '',
           \ 'You: '
-          \ ])
+          \ ]
+    
+    call setbufline(chat_bufnr, 1, welcome_msg)
     
     " Set up mappings for the chat buffer
     call s:SetupChatMappings(chat_bufnr)
@@ -200,6 +206,8 @@ function! s:CleanupChatBufferMappings() abort
   iunmap <buffer> <C-C>
   nunmap <buffer> <CR>
 endfunction
+
+function! s:SendChatMessage() abort
   " Get the current line
   let line = getline('.')
   
@@ -208,6 +216,12 @@ endfunction
     let message = substitute(line, '^You: ', '', '')
     
     if !empty(trim(message))
+      " Handle special commands
+      if message =~# '^/'
+        call s:HandleChatCommand(message)
+        return
+      endif
+      
       " Replace the current line with the full message
       call setline('.', 'You: ' . message)
       
@@ -218,8 +232,7 @@ endfunction
       call cursor(line('$'), 1)
       redraw
       
-      " TODO: Send actual chat request to server
-      " For now, provide a simple response
+      " Get AI response
       let response = s:GetChatResponse(message)
       
       " Replace the thinking line with actual response
@@ -236,15 +249,116 @@ endfunction
   endif
 endfunction
 
+function! s:HandleChatCommand(command) abort
+  let cmd = tolower(trim(a:command))
+  
+  if cmd ==# '/clear'
+    " Clear chat history but keep welcome message
+    let welcome_msg = [
+          \ 'Neopilot Chat - AI Assistant',
+          \ '================================',
+          \ '',
+          \ 'Welcome! I can help you with coding questions and provide assistance.',
+          \ '',
+          \ 'Commands:',
+          \ '  /clear  - Clear the chat history',
+          \ '  /help   - Show this help message',
+          \ '  /quit   - Close the chat',
+          \ '',
+          \ 'Just type your message and press Enter to send.',
+          \ '',
+          \ 'You: '
+          \ ]
+    %delete
+    call setline(1, welcome_msg)
+    call cursor(line('$'), col('$'))
+    startinsert!
+  elseif cmd ==# '/help'
+    let help_msg = [
+          \ 'Assistant: Available commands:',
+          \ '  /clear  - Clear the chat history',
+          \ '  /help   - Show this help message',
+          \ '  /quit   - Close the chat',
+          \ '',
+          \ 'You can also ask me coding questions, get explanations, or request help with specific programming tasks.',
+          \ '',
+          \ 'You: '
+          \ ]
+    call append(line('$'), help_msg)
+    call cursor(line('$'), col('$'))
+    startinsert!
+  elseif cmd ==# '/quit'
+    quit
+  else
+    let error_msg = [
+          \ 'Assistant: Unknown command: ' . a:command,
+          \ 'Type /help for available commands.',
+          \ '',
+          \ 'You: '
+          \ ]
+    call append(line('$'), error_msg)
+    call cursor(line('$'), col('$'))
+    startinsert!
+  endif
+endfunction
+
 function! s:GetChatResponse(message) abort
-  " Placeholder chat responses - in a real implementation, this would call the AI API
-  let responses = [
-        \ "That's an interesting question! I'm still learning how to provide detailed responses.",
-        \ "I understand you're asking about: " . a:message . ". This is a placeholder response.",
-        \ "Thanks for your message! Chat functionality is coming soon with full AI integration.",
-        \ "I'm here to help with coding questions. What specific programming topic can I assist you with?",
-        \ "Your message has been received. In the future, I'll be able to provide intelligent responses to coding questions."
-        \ ]
+  " Enhanced chat responses with some basic pattern matching
+  let msg_lower = tolower(a:message)
+  
+  " Check for coding-related questions
+  if msg_lower =~# 'vim\|neovim'
+    let responses = [
+          \ "Vim is a powerful text editor! I can help you with Vimscript, plugins, and configuration. What specific aspect are you working on?",
+          \ "Neovim is a great choice for modern development. I can assist with Lua configuration, plugin development, and Vimscript migration.",
+          \ "Vim has excellent scripting capabilities. Whether you're writing Vimscript functions or configuring your editor, I'm here to help!"
+          \ ]
+  elseif msg_lower =~# 'python'
+    let responses = [
+          \ "Python is a versatile language! I can help with syntax, best practices, libraries, and debugging. What are you working on?",
+          \ "Python's readability and extensive libraries make it great for many applications. Need help with a specific Python concept or problem?",
+          \ "From web development with Django/Flask to data science with pandas/numpy, Python has you covered. How can I assist?"
+          \ ]
+  elseif msg_lower =~# 'javascript\|typescript\|node'
+    let responses = [
+          \ "JavaScript/TypeScript are essential for modern web development. I can help with frameworks, async programming, and best practices.",
+          \ "Node.js brings JavaScript to the server side. Need help with npm, Express, or building scalable applications?",
+          \ "Modern JS development involves many tools and frameworks. Whether it's React, Vue, or vanilla JS, I can provide guidance."
+          \ ]
+  elseif msg_lower =~# 'git\|version control'
+    let responses = [
+          \ "Git is crucial for modern development workflows. I can help with branching strategies, merge conflicts, and best practices.",
+          \ "Version control keeps your code safe and enables collaboration. Need help with a specific Git command or workflow?",
+          \ "Understanding Git's data model and common workflows can greatly improve your development process. What would you like to know?"
+          \ ]
+  elseif msg_lower =~# 'debug\|error\|bug'
+    let responses = [
+          \ "Debugging is a crucial skill! I can help you identify issues, use debugging tools, and implement fixes. What's the problem?",
+          \ "Error messages can be cryptic, but they usually point to the solution. Let's break down what you're seeing.",
+          \ "Systematic debugging approaches can save hours. Tell me about the issue and we'll work through it together."
+          \ ]
+  elseif msg_lower =~# 'hello\|hi\|hey'
+    let responses = [
+          \ "Hello! I'm here to help with your coding questions and provide assistance. What would you like to work on today?",
+          \ "Hi there! Ready to tackle some code? Whether it's debugging, learning new concepts, or getting unstuck, I'm here to help.",
+          \ "Hey! Great to see you. I can help with programming languages, tools, best practices, and problem-solving. What's on your mind?"
+          \ ]
+  elseif msg_lower =~# 'thank\|thanks'
+    let responses = [
+          \ "You're welcome! Happy to help. Feel free to ask if you have more questions.",
+          \ "Glad I could assist! Programming can be challenging, but you're making great progress.",
+          \ "No problem at all! Keep coding and don't hesitate to reach out when you need help."
+          \ ]
+  else
+    " General coding assistance responses
+    let responses = [
+          \ "That's an interesting topic! I can help you explore that further. Could you provide more details about what you're trying to accomplish?",
+          \ "I understand you're working on " . a:message . ". I'd be happy to help you understand this better or solve any related problems.",
+          \ "Programming involves many concepts and tools. I can provide explanations, examples, and guidance. What specific aspect would you like to focus on?",
+          \ "Every programming challenge is an opportunity to learn! Let's break this down and find the best approach together.",
+          \ "Code is like a puzzle - sometimes you need a different perspective. I can offer insights and alternative solutions to help you move forward."
+          \ ]
+  endif
   
   " Simple hash-based response selection for some variety
   let hash = 0

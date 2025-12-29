@@ -28,9 +28,10 @@ COMMANDS                                        *:Neopilot*
 
                                                 *:Neopilot_Chat*
 :Neopilot Chat           Open an interactive chat window with Neopilot AI.
+                        Use /help in the chat for available commands.
 
 
-OPTIONS                                         *neopilot-options*
+CONFIGURATION                                         *neopilot-configuration*
 
                                                 *g:neopilot_filetypes*
 g:neopilot_filetypes     A dictionary mapping whether neopilot should be
@@ -49,7 +50,42 @@ g:neopilot_enabled       A global boolean flag that controls whether neopilot
 >
                         let g:neopilot_enabled = v:true
 <
+                                                *g:neopilot_idle_delay*
+g:neopilot_idle_delay     Delay in milliseconds before requesting completions
+                        after typing stops. Default is 75ms.
+>
+                        let g:neopilot_idle_delay = 150
+<
 
+                                                *g:neopilot_log_level*
+g:neopilot_log_level     Logging level for debugging. Options: ERROR, WARN,
+                        INFO, DEBUG, TRACE. Default is WARN.
+>
+                        let g:neopilot_log_level = 'INFO'
+<
+
+                                                *g:neopilot_log_file*
+g:neopilot_log_file      Path to log file for debugging output.
+>
+                        let g:neopilot_log_file = '/tmp/neopilot.log'
+<
+
+                                                *g:neopilot_server_config*
+g:neopilot_server_config Dictionary for server configuration options.
+>
+                        let g:neopilot_server_config = {
+                              \ 'api_host': 'server.neopilot.com',
+                              \ 'api_port': '443'
+                              \ }
+<
+
+                                                *g:neopilot_tab_fallback*
+g:neopilot_tab_fallback  Expression to use when Tab is pressed but no
+                        completion is available. Default uses standard Vim
+                        completion.
+>
+                        let g:neopilot_tab_fallback = "\<Tab>"
+<
 MAPS                                            *neopilot-maps*
 
                                                 *neopilot-i_<Tab>*

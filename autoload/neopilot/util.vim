@@ -29,7 +29,8 @@ function! neopilot#util#PositionToOffset(row, col) abort
   return neopilot#util#UTF8Width(text_pre)
 endfunction
 
-function! neopilot#util#OffsetToPosition(offset) abort  if a:offset < 0
+function! neopilot#util#OffsetToPosition(offset) abort
+  if a:offset < 0
     return [1, 1]
   endif
   " Ideally we could just use byte2line, but encoding might not be UTF-8.
@@ -65,4 +66,12 @@ function! neopilot#util#HasSupportedVersion() abort
   let s:vim_virt_text_support = has('patch-9.0.0185') && has('textprop')
 
   return s:nvim_virt_text_support || s:vim_virt_text_support
+endfunction
+
+function! neopilot#util#ConfigDir() abort
+  let config_dir = $XDG_CONFIG_HOME
+  if empty(config_dir)
+    let config_dir = $HOME . '/.config'
+  endif
+  return config_dir . '/neopilot'
 endfunction

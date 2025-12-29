@@ -4,7 +4,6 @@ endif
 let g:loaded_neopilot = 1
 
 command! -nargs=? -complete=customlist,neopilot#command#Complete Neopilot exe neopilot#command#Command(<q-args>)
-command! NeopilotChat call neopilot#command#Chat()
 
 if !neopilot#util#HasSupportedVersion()
     finish

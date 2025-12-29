@@ -24,14 +24,6 @@ endif
 let s:server_port = v:null
 let s:server_job = v:null
 
-function! s:ConfigDir() abort
-  let config_dir = $XDG_CONFIG_HOME
-  if empty(config_dir)
-    let config_dir = $HOME . '/.config'
-  endif
-  return config_dir . '/neopilot'
-endfunction
-
 function! s:DownloadBinary(bin, url) abort
   try
     call neopilot#log#Info("Downloading language server from " . a:url)
@@ -143,15 +135,33 @@ function! s:FindPort(dir, timer) abort
   endfor
 endfunction
 
-function! s:SendHeartbeat(timer) abort
-  try
-    call neopilot#server#Request('Heartbeat', {'metadata': neopilot#server#RequestMetadata()})
-  catch
-    call neopilot#log#Exception()
-  endtry
+function! neopilot#server#IsRunning() abort
+  return s:server_job isnot# v:null && s:server_port isnot# v:null
+endfunction
+
+function! neopilot#server#Stop() abort
+  if s:server_job isnot# v:null
+    try
+      if has('nvim')
+        call jobstop(s:server_job)
+      else
+        call job_stop(s:server_job)
+      endif
+      call neopilot#log#Info("Server stopped")
+    catch
+      call neopilot#log#Exception()
+    endtry
+    let s:server_job = v:null
+    let s:server_port = v:null
+  endif
 endfunction
 
 function! neopilot#server#Start() abort
+  if s:server_job isnot# v:null
+    call neopilot#log#Info("Server already running")
+    return
+  endif
+
   let os = substitute(system('uname'), '\n', '', '')
   let arch = substitute(system('uname -m'), '\n', '', '')
   let is_arm = stridx(arch, "arm") == 0 || stridx(arch, "aarch64") == 0
@@ -169,7 +179,7 @@ function! neopilot#server#Start() abort
   endif
 
   let s:root = expand('<sfile>:h:h')
-  let bin_dir = s:ConfigDir() . '/bin'
+  let bin_dir = neopilot#util#ConfigDir() . '/bin'
   let bin = bin_dir . "/language_server_" . bin_suffix
 
   call mkdir(bin_dir, "p")
@@ -177,8 +187,15 @@ function! neopilot#server#Start() abort
   if empty(glob(bin))
     let url = 'https://github.com/neopilot-ai/neopilot/releases/download/language-server-v' . s:language_server_version . '/language_server_' . bin_suffix . '.gz'
     if !s:DownloadBinary(bin, url)
+      call neopilot#log#Error("Failed to start server: could not download binary")
       return ''
     endif
+  endif
+
+  " Verify binary is executable
+  if !executable(bin)
+    call neopilot#log#Error("Binary is not executable: " . bin)
+    return ''
   endif
 
   let config = get(g:, "neopilot_server_config", {})
@@ -205,17 +222,31 @@ function! neopilot#server#Start() abort
         \ "--manager_dir", manager_dir
         \ ] + chat_client_port_arg
 
-  call neopilot#log#Info("Launching server with manager_dir " . manager_dir)
-  if has('nvim')
-    let s:server_job = jobstart(args, {
-                \ 'on_stderr': { channel, data, t -> neopilot#log#Info("[SERVER] " . join(data, "\n")) },
-                \ })
-  else
-    let s:server_job = job_start(args, {
-                \ 'out_mode': 'raw',
-                \ 'err_cb': { channel, data -> neopilot#log#Info("[SERVER] " . data) },
-                \ })
-  endif
-  call timer_start(500, function('s:FindPort', [manager_dir]), {'repeat': -1})
-  call timer_start(5000, function('s:SendHeartbeat', []), {'repeat': -1})
+  call neopilot#log#Info("Launching server with manager_dir " . manager_dir . " and API host " . api_host . ":" . api_port)
+
+  try
+    if has('nvim')
+      let s:server_job = jobstart(args, {
+            \ 'on_stderr': { channel, data, t -> neopilot#log#Info("[SERVER] " . join(data, "\n")) },
+            \ })
+    else
+      let s:server_job = job_start(args, {
+            \ 'out_mode': 'raw',
+            \ 'err_cb': { channel, data -> neopilot#log#Info("[SERVER] " . data) },
+            \ })
+    endif
+
+    if s:server_job is# v:null || s:server_job == -1
+      call neopilot#log#Error("Failed to start server job")
+      return ''
+    endif
+
+    call neopilot#log#Info("Server job started with ID: " . s:server_job)
+    call timer_start(500, function('s:FindPort', [manager_dir]), {'repeat': -1})
+    call timer_start(5000, function('s:SendHeartbeat', []), {'repeat': -1})
+  catch
+    call neopilot#log#Exception()
+    let s:server_job = v:null
+    return ''
+  endtry
 endfunction

@@ -286,6 +286,13 @@ function! neopilot#Complete(...) abort
     return
   endif
 
+  " Validate that we have a valid document
+  let doc = neopilot#doc#GetCurrentDocument()
+  if empty(doc.text)
+    call neopilot#log#Warn("Cannot complete: empty document")
+    return
+  endif
+
   let data = {
         \ "metadata": neopilot#server#RequestMetadata(),
         \ "document": neopilot#doc#GetCurrentDocument(),
