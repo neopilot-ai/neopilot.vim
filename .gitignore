@@ -1,0 +1,22 @@
+# Vim
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Development
+.vscode/
+.idea/
+
+# Temporary files
+tmp/
+temp/
+
+# Neopilot specific
+# (The VERSION file should be tracked for version management)
