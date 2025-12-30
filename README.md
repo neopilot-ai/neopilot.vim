@@ -3,16 +3,11 @@
 
 AI-powered code completion for Vim/Neovim, inspired by GitHub Copilot.
 
-## Status
-
-**🚀 v1.0-beta** - Production ready with enterprise-grade reliability and intelligence.
-
-See [STABILITY.md](STABILITY.md) for stability guarantees and API contracts.
-
 ## Installation
 
 ### Using vim-plug
 ```vim
+Plug 'nvim-lua/plenary.nvim'
 Plug 'neopilot-ai/neopilot.vim'
 ```
 
@@ -43,9 +38,7 @@ git clone https://github.com/neopilot-ai/neopilot.vim.git ~/.local/share/nvim/si
 - **Performance optimized**: Intelligent caching and request deduplication
 - **nvim-cmp integration**: Enhanced completion UX with nvim-cmp
 - **Comprehensive diagnostics**: Built-in health checks and testing
-- **Context-aware suggestions**: Smarter completions based on semantic context
-- **Advanced observability**: Performance metrics and usage statistics
-- **Streaming-ready architecture**: Future-ready for token streaming
+- **Context-aware suggestions**: Smarter completions based on file content
 
 ## nvim-cmp Integration
 
@@ -66,16 +59,17 @@ This provides:
 - Enhanced trigger characters
 - Rich completion documentation
 
-## Intelligent Context Engine
+## Telescope Integration
 
-Neopilot uses advanced context extraction to provide more accurate completions:
+To use Neopilot with Telescope, first load the extension:
+```lua
+require('telescope').load_extension('neopilot')
+```
 
-- **Treesitter Integration**: Semantic-aware context when available
-- **Token Budgeting**: Intelligent truncation to stay within model limits
-- **Scope Awareness**: Understands functions, classes, and code structure
-- **Multi-language Support**: Language-specific patterns and parsing
-
-The context engine automatically adapts based on your Neovim setup and language.
+You can then use the following commands:
+- `:Telescope neopilot commands` - Browse and run Neopilot commands.
+- `:Telescope neopilot completions` - Browse completion history (not yet implemented).
+- `:Telescope neopilot chat_history` - Browse chat history (not yet implemented).
 
 ## Commands
 
@@ -87,7 +81,6 @@ The context engine automatically adapts based on your Neovim setup and language.
 - `:Neopilot DisableBuffer` - Disable for current buffer only
 - `:Neopilot Health` - Run comprehensive health check (Neovim + Lua only)
 - `:Neopilot Test` - Run test suite (Neovim + Lua only)
-- `:Neopilot Stats` - Show performance and usage statistics (Neovim + Lua only)
 
 ## Key Mappings
 
@@ -138,12 +131,6 @@ let g:neopilot_cache_ttl = 30000  " Cache TTL in milliseconds
 let g:neopilot_min_request_interval = 50  " Minimum time between requests
 let g:neopilot_max_cache_size = 50  " Maximum cached completions
 
-" Context engine configuration (Neovim + Lua only)
-let g:neopilot_context_max_tokens = 2048  " Token budget for context
-let g:neopilot_context_max_lines_before = 50  " Lines to look back
-let g:neopilot_context_max_lines_after = 10  " Lines to look forward
-let g:neopilot_context_semantic_depth = 3  " Scope depth for semantic analysis
-
 " Server configuration
 let g:neopilot_server_path = ''  " Custom server binary path
 let g:neopilot_log_dir = ''  " Custom log directory
@@ -176,6 +163,7 @@ git commit -m "feat!: change API breaking backward compatibility"
 
 - **Vim**: 9.0.0185+ with text properties
 - **Neovim**: 0.6.0+ with virtual text support
+- **plenary.nvim**: Required for Neovim users.
 - **curl**: For API communication
 - **git**: For version control
 
@@ -191,7 +179,6 @@ let g:neopilot_log_file = '/tmp/neopilot.log'
 ```vim
 :NeopilotHealth  " Comprehensive health check
 :NeopilotTest    " Run test suite
-:NeopilotStats   " Show performance metrics
 ```
 
 ### Check server status:
@@ -201,13 +188,11 @@ The language server binary is downloaded to `~/.config/neopilot/bin/`
 - **Slow completions**: Increase `g:neopilot_idle_delay` or `g:neopilot_min_request_interval`
 - **Memory usage**: Decrease `g:neopilot_max_cache_size`
 - **Cache issues**: Adjust `g:neopilot_cache_ttl`
-- **Context too large**: Reduce `g:neopilot_context_max_tokens` or line limits
 
 ### Common issues:
 - **No completions**: Ensure you're authenticated (`:Neopilot Auth`)
 - **Permission errors**: Check write access to `~/.config/neopilot/`
 - **Lua errors**: Run `:NeopilotHealth` to check Lua module loading
-- **Poor completion quality**: Check `:NeopilotStats` for cache hit rates
 
 ## Contributing
 
@@ -216,16 +201,6 @@ The language server binary is downloaded to `~/.config/neopilot/bin/`
 3. Make your changes
 4. Use conventional commits for your messages
 5. Submit a pull request
-
-## Stability & Compatibility
-
-Neopilot follows semantic versioning with clear stability guarantees:
-
-- **Stable APIs**: Commands, basic configuration, core functionality
-- **Beta Features**: Advanced configuration, observability, integrations
-- **Internal**: Implementation details, may change anytime
-
-See [STABILITY.md](STABILITY.md) for detailed stability contracts and compatibility guarantees.
 
 ## License
 
