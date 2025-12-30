@@ -9,6 +9,8 @@ local util = require('neopilot.util')
 local log = require('neopilot.log')
 local metrics = require('neopilot.metrics')
 local lsp = require('neopilot.lsp')
+local virtual_text = require('neopilot.virtual_text')
+local events = require('neopilot.events')
 
 -- Completion state
 local completion_state = {
@@ -31,6 +33,9 @@ local MIN_REQUEST_INTERVAL = 50 -- Minimum time between requests
 
 -- Setup core module
 function M.setup(opts)
+    -- Initialize virtual text system
+    virtual_text.setup(opts.virtual_text or {})
+    
     -- Initialize completion state and cache cleanup
     vim.defer_fn(function()
         M.cleanup_cache()
@@ -145,8 +150,9 @@ function M.clear()
         debounce_timer = nil
     end
 
-    -- Clear UI
+    -- Clear UI and virtual text
     ui.clear_completion()
+    virtual_text.clear_completion()
 
     -- Reset state
     completion_state.items = {}
@@ -387,6 +393,7 @@ local function handle_completions_response(response, status, request_id, start_t
     if not response or status ~= 0 then
         log.error("Invalid response from language server")
         metrics.record_error("invalid_response")
+        virtual_text.show_error('Failed to get completion')
         return
     end
 
@@ -403,6 +410,8 @@ local function handle_completions_response(response, status, request_id, start_t
         store_cache(cache_key, completion_items, context)
     end
 
+    -- Clear progress and show completion
+    virtual_text.clear_completion()
     M.render_current_completion()
 end
 
@@ -435,12 +444,18 @@ function M.request_completions()
 
     metrics.record_cache_miss()
 
+    -- Show progress indicator
+    virtual_text.show_progress('Requesting completion', 25)
+
     -- Generate new request ID and cancel any active request
     request_counter = request_counter + 1
     local current_request_id = request_counter
     active_request_id = current_request_id
 
     metrics.record_request_start()
+    
+    -- Update progress
+    virtual_text.show_progress('Requesting completion', 50)
 
     local params = {
         metadata = server.request_metadata(),
@@ -484,6 +499,7 @@ function M.render_current_completion()
     local current_item = M.get_current_completion_item()
     if not current_item then
         ui.clear_completion()
+        virtual_text.clear_completion()
         return
     end
 
@@ -493,10 +509,21 @@ function M.render_current_completion()
     if start_row ~= vim.fn.line('.') then
         log.info("Ignoring completion, line number is not the current line.")
         ui.clear_completion()
+        virtual_text.clear_completion()
         return
     end
 
+    -- Use virtual text for inline display
+    virtual_text.show_completion(current_item)
+    
+    -- Also use traditional UI for compatibility
     ui.render_completion(current_item)
+    
+    -- Emit completion shown event
+    events.emit(events.EVENT_TYPES.COMPLETION_SHOWN, {
+        item = current_item
+    }, { source = 'core' })
+    
     vim.cmd('doautocmd User NeopilotCompletionShown')
 end
 

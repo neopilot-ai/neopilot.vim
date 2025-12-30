@@ -5,6 +5,8 @@ local Job = require('plenary.job')
 local config = require('neopilot.config')
 local util = require('neopilot.util')
 local log = require('neopilot.log')
+local io_module = require('neopilot.io')
+local events = require('neopilot.events')
 
 function M.setup()
     -- No setup needed for server module at this time
@@ -38,45 +40,92 @@ local function get_binary_path()
     return bin_dir .. '/language_server_' .. bin_suffix
 end
 
--- Download the server binary
+-- Download server binary using I/O module
 local function download_binary(path)
     local bin_suffix = path:match('language_server_(.+)')
     local url = 'https://github.com/neopilot-ai/neopilot/releases/download/language-server-v' .. language_server_version .. '/language_server_' .. bin_suffix .. '.gz'
 
     log.info('Downloading language server from ' .. url)
     vim.notify('Neopilot: Downloading server binary...')
-
-    Job:new({
-        command = 'curl',
-        args = { '-Lo', path .. '.gz', url },
-        on_exit = function(j, return_val)
-            if return_val ~= 0 then
-                log.error('Failed to download server binary.')
-                vim.notify('Neopilot: Failed to download server binary.', vim.log.levels.ERROR)
-                return
-            end
-
-            log.info('Extracting server binary...')
-            Job:new({
-                command = 'gzip',
-                args = { '-d', path .. '.gz' },
-                on_exit = function(gzip_job, gzip_return_val)
-                    if gzip_return_val ~= 0 then
-                        log.error('Failed to extract server binary.')
-                        vim.notify('Neopilot: Failed to extract server binary.', vim.log.levels.ERROR)
-                        return
-                    end
-
-                    log.info('Setting executable permissions...')
-                    vim.fn.system('chmod +x ' .. path)
-                    vim.notify('Neopilot: Server binary downloaded successfully. Please restart Neovim.')
-                end,
-            }):start()
-        end,
-    }):start()
+    
+    -- Show progress
+    require('neopilot.virtual_text').show_progress('Downloading server binary', 25)
+    
+    -- Download using I/O module
+    io_module.http_request_async(url, {
+        method = 'GET',
+        timeout = 30000 -- 30 seconds
+    }, function(response, error)
+        if error or not response then
+            log.error('Failed to download server binary: ' .. tostring(error))
+            vim.notify('Neopilot: Failed to download server binary.', vim.log.levels.ERROR)
+            require('neopilot.virtual_text').show_error('Failed to download server binary')
+            return
+        end
+        
+        require('neopilot.virtual_text').show_progress('Downloading server binary', 75)
+        
+        -- Save downloaded file
+        local success, write_error = io_module.write_file(path .. '.gz', response.body, { binary = true })
+        if not success then
+            log.error('Failed to save downloaded binary: ' .. tostring(write_error))
+            vim.notify('Neopilot: Failed to save downloaded binary.', vim.log.levels.ERROR)
+            require('neopilot.virtual_text').show_error('Failed to save downloaded binary')
+            return
+        end
+        
+        -- Extract the file
+        log.info('Extracting server binary...')
+        require('neopilot.virtual_text').show_progress('Extracting server binary', 90)
+        
+        local extract_success, extract_error = M.extract_gzip(path .. '.gz', path)
+        if not extract_success then
+            log.error('Failed to extract server binary: ' .. tostring(extract_error))
+            vim.notify('Neopilot: Failed to extract server binary.', vim.log.levels.ERROR)
+            require('neopilot.virtual_text').show_error('Failed to extract server binary')
+            return
+        end
+        
+        -- Set executable permissions
+        log.info('Setting executable permissions...')
+        vim.fn.system('chmod +x ' .. path)
+        
+        require('neopilot.virtual_text').show_progress('Download complete', 100)
+        vim.notify('Neopilot: Server binary downloaded successfully. Please restart Neovim.')
+        
+        -- Emit download complete event
+        events.emit(events.EVENT_TYPES.SERVER_DOWNLOADED, {
+            path = path,
+            version = language_server_version
+        }, { source = 'server' })
+    end)
 end
 
--- Start the server
+-- Extract gzip file using I/O module
+function M.extract_gzip(source_path, dest_path)
+    -- Read gzip file
+    local compressed_data, error = io_module.read_file(source_path, { binary = true })
+    if not compressed_data then
+        return false, error
+    end
+    
+    -- Extract using system gzip command (more reliable than Lua implementation)
+    local success, extract_error = pcall(function()
+        local result = vim.fn.system(string.format('gzip -d -c "%s" > "%s"', source_path, dest_path))
+        return result.code == 0
+    end)
+    
+    if not success then
+        return false, extract_error
+    end
+    
+    -- Clean up compressed file
+    vim.fn.delete(source_path)
+    
+    return true
+end
+
+-- Start server
 function M.start()
     if M.is_running() then
         log.info('Server already running.')
