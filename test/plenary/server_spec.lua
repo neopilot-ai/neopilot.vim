@@ -1,0 +1,8 @@
+describe('neopilot.server', function()
+  it('should have start, stop, and is_running functions', function()
+    local server = require('neopilot.server')
+    assert.is_function(server.start)
+    assert.is_function(server.stop)
+    assert.is_function(server.is_running)
+  end)
+end)
